@@ -1,48 +1,118 @@
 #!/usr/bin/env python3
+"""Command-line entry point for the diff utility.
 
-# sys: for reading command-line arguments.
-# rich: for coloring the text.
+Usage:
+    python diff.py <original_file> <changed_file>
+
+Run ``python diff.py --help`` for the full option list.
+"""
+
+import argparse
 import sys
-from rich import print
+from typing import List
 
-# Print Usage message if enough arguments are not passed.
-if len(sys.argv) < 3:
-    print("Usage:")
-    print("\tMust provide two file names as command-line arguments.")
-    print("\tdiff.py <orignal_file> <changed_file>")
-    exit(1)
+from rich.console import Console
 
-orignal = sys.argv[1]
-changed = sys.argv[2]
+from diff_core import ChangeType, DiffEntry, compute_diff, read_file_lines
 
-# Read the contents of the files in lists.
-orignal_contents = open(orignal, "r").readlines()
-changed_contents = open(changed, "r").readlines()
+console = Console()
 
-color = "green"
-symbol = f"[bold {color}][+]"
 
-print()
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
 
-# Determine which file has changed much.
-if len(changed_contents) <= len(orignal_contents):
-    color = "red"
-    symbol = f"[bold {color}][-]"
-    smallest_sloc, largest_sloc = changed_contents, orignal_contents
-else:
-    smallest_sloc, largest_sloc = orignal_contents, changed_contents
+def build_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser."""
+    parser = argparse.ArgumentParser(
+        prog="diff.py",
+        description="A minimal clone of the UNIX diff program. "
+                    "Compares two files line by line and highlights additions, "
+                    "deletions, and changes.",
+    )
+    parser.add_argument(
+        "original",
+        metavar="original_file",
+        help="Path to the original (base) file.",
+    )
+    parser.add_argument(
+        "changed",
+        metavar="changed_file",
+        help="Path to the changed (new) file.",
+    )
+    return parser
 
-# Go over all the lines to check the changes.
-for line in range(0, len(smallest_sloc)):
-    if orignal_contents[line] == changed_contents[line]:
-        # Ignore if the lines are same.
-        continue
-    else:
-        # Display the changes on the respective lines of the files.
-        print(f"[bold red][-] Line {line + 1}:[/bold red] {orignal_contents[line]}", end = "")
-        print(f"[bold green][+] Line {line + 1}:[/bold green] {changed_contents[line]}")
 
-        # Show the additions [+] or deletions [-] for the file that is the largest.
-        if line == len(smallest_sloc) - 1:
-            for new_line in range(line + 1, len(largest_sloc)):
-                print(f"{symbol} Line {new_line + 1}:[/bold {color}] {largest_sloc[new_line]}")
+# ---------------------------------------------------------------------------
+# Terminal output
+# ---------------------------------------------------------------------------
+
+def _format_line(tag: str, color: str, line_number: int, text: str) -> str:
+    """Return a single rich-formatted output line."""
+    return f"[bold {color}][{tag}] Line {line_number}:[/bold {color}] {text}"
+
+
+def display_diff(entries: List[DiffEntry]) -> None:
+    """Print *entries* to the terminal using rich markup.
+
+    Only CHANGED, ADDED, and REMOVED entries produce output; EQUAL entries
+    are silently skipped.
+    """
+    console.print()  # Leading blank line, matching original behaviour.
+
+    for entry in entries:
+        if entry.change_type == ChangeType.CHANGED:
+            console.print(
+                _format_line("-", "red", entry.line_number, entry.original_line or "")
+            )
+            console.print(
+                _format_line("+", "green", entry.line_number, entry.changed_line or "")
+            )
+
+        elif entry.change_type == ChangeType.REMOVED:
+            console.print(
+                _format_line("-", "red", entry.line_number, entry.original_line or "")
+            )
+
+        elif entry.change_type == ChangeType.ADDED:
+            console.print(
+                _format_line("+", "green", entry.line_number, entry.changed_line or "")
+            )
+
+        # EQUAL entries: no output.
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main(argv: List[str] | None = None) -> int:
+    """Program entry point.  Returns the process exit code."""
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        original_lines = read_file_lines(args.original)
+    except FileNotFoundError:
+        console.print(f"[bold red]Error:[/bold red] file not found: {args.original}")
+        return 1
+    except PermissionError:
+        console.print(f"[bold red]Error:[/bold red] permission denied: {args.original}")
+        return 1
+
+    try:
+        changed_lines = read_file_lines(args.changed)
+    except FileNotFoundError:
+        console.print(f"[bold red]Error:[/bold red] file not found: {args.changed}")
+        return 1
+    except PermissionError:
+        console.print(f"[bold red]Error:[/bold red] permission denied: {args.changed}")
+        return 1
+
+    entries = compute_diff(original_lines, changed_lines)
+    display_diff(entries)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
