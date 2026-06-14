@@ -1,48 +1,52 @@
 #!/usr/bin/env python3
+"""Command-line entry point for the minimal ``diff`` clone.
 
-# sys: for reading command-line arguments.
-# rich: for coloring the text.
+This module only handles argument parsing and output; all comparison
+logic lives in :mod:`diff_util` so it can be imported and tested on its
+own. Importing this file does not run the tool - call :func:`main` or run
+it as a script.
+
+Usage:
+    python diff.py <original_file> <changed_file>
+"""
+
 import sys
+from typing import List, Optional
+
 from rich import print
 
-# Print Usage message if enough arguments are not passed.
-if len(sys.argv) < 3:
-    print("Usage:")
-    print("\tMust provide two file names as command-line arguments.")
-    print("\tdiff.py <orignal_file> <changed_file>")
-    exit(1)
+from diff_util import compare_lines, format_changes, read_lines
 
-orignal = sys.argv[1]
-changed = sys.argv[2]
+USAGE = (
+    "Usage:\n"
+    "\tMust provide two file names as command-line arguments.\n"
+    "\tdiff.py <original_file> <changed_file>"
+)
 
-# Read the contents of the files in lists.
-orignal_contents = open(orignal, "r").readlines()
-changed_contents = open(changed, "r").readlines()
 
-color = "green"
-symbol = f"[bold {color}][+]"
+def main(argv: Optional[List[str]] = None) -> int:
+    """Run the diff tool. Returns a process exit code."""
+    args = sys.argv[1:] if argv is None else argv
 
-print()
+    if len(args) < 2:
+        print(USAGE)
+        return 1
 
-# Determine which file has changed much.
-if len(changed_contents) <= len(orignal_contents):
-    color = "red"
-    symbol = f"[bold {color}][-]"
-    smallest_sloc, largest_sloc = changed_contents, orignal_contents
-else:
-    smallest_sloc, largest_sloc = orignal_contents, changed_contents
+    original_path, changed_path = args[0], args[1]
 
-# Go over all the lines to check the changes.
-for line in range(0, len(smallest_sloc)):
-    if orignal_contents[line] == changed_contents[line]:
-        # Ignore if the lines are same.
-        continue
-    else:
-        # Display the changes on the respective lines of the files.
-        print(f"[bold red][-] Line {line + 1}:[/bold red] {orignal_contents[line]}", end = "")
-        print(f"[bold green][+] Line {line + 1}:[/bold green] {changed_contents[line]}")
+    try:
+        original_contents = read_lines(original_path)
+        changed_contents = read_lines(changed_path)
+    except FileNotFoundError as error:
+        print(f"[bold red]Error:[/bold red] file not found: {error.filename}")
+        return 1
 
-        # Show the additions [+] or deletions [-] for the file that is the largest.
-        if line == len(smallest_sloc) - 1:
-            for new_line in range(line + 1, len(largest_sloc)):
-                print(f"{symbol} Line {new_line + 1}:[/bold {color}] {largest_sloc[new_line]}")
+    changes = compare_lines(original_contents, changed_contents)
+    for line in format_changes(changes):
+        print(line)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
