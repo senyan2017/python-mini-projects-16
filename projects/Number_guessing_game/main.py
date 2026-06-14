@@ -1,54 +1,76 @@
 import random
 
-print("Number guessing game")
+MAX_ATTEMPTS = 5
+MIN_NUMBER = 1
+MAX_NUMBER = 9
 
-# randint function to generate the
-# random number b/w 1 to 9
-number = random.randint(1, 9)
 
-# number of chances to be given
-# to the user to guess the number
-# or it is the inputs given by user
-# into input box here number of
-# chances are 5
-chances = 0
+def get_valid_guess():
+    """Prompt the user until a valid integer within [MIN_NUMBER, MAX_NUMBER] is entered."""
+    while True:
+        raw = input(f"Guess a number (between {MIN_NUMBER} and {MAX_NUMBER}): ").strip()
+        if not raw:
+            print("Empty input. Please enter a whole number.")
+            continue
+        try:
+            guess = int(raw)
+        except ValueError:
+            print(f"Invalid input '{raw}'. Please enter a whole number.")
+            continue
+        if guess < MIN_NUMBER or guess > MAX_NUMBER:
+            print(
+                f"{guess} is out of range. "
+                f"Please enter a number between {MIN_NUMBER} and {MAX_NUMBER}."
+            )
+            continue
+        return guess
 
-print("Guess a number (between 1 and 9):")
 
-# While loop to count the number
-# of chances
-while True:
+def play_game():
+    """Run one round of the guessing game. Return True if the player wins."""
+    number = random.randint(MIN_NUMBER, MAX_NUMBER)
 
-    # Enter a number between 1 to 9
-    guess = int(input())
+    print("Number Guessing Game")
+    print(
+        f"You have {MAX_ATTEMPTS} attempts to guess "
+        f"the number between {MIN_NUMBER} and {MAX_NUMBER}."
+    )
 
-    # Compare the user entered number
-    # with the number to be guessed
-    if guess == number:
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        guess = get_valid_guess()
 
-        # if number entered by user
-        # is same as the generated
-        # number by randint function then
-        # break from loop using loop
-        # control statement "break"
-        print(
-            f'CONGRATULATIONS! YOU HAVE GUESSED THE \
-            NUMBER {number} IN {chances} ATTEMPTS!')
-        # Printing final statement using the f-strings method;
-        break
+        if guess == number:
+            print(
+                f"Congratulations! You guessed the number {number} "
+                f"in {attempt} attempt(s)!"
+            )
+            return True
 
-    # Check if the user entered
-    # number is smaller than
-    # the generated number
-    elif guess < number:
-        print("Your guess was too low: Guess a number higher than", guess)
+        if guess < number:
+            print(f"Your guess was too low. Guess a number higher than {guess}.")
+        else:
+            print(f"Your guess was too high. Guess a number lower than {guess}.")
 
-    # The user entered number is
-    # greater than the generated
-    # number
-    else:
-        print("Your guess was too high: Guess a number lower than", guess)
+        remaining = MAX_ATTEMPTS - attempt
+        if remaining > 0:
+            print(f"Attempts remaining: {remaining}")
 
-    # Increase the value of chance by 1
-    chances += 1
-    
+    print(
+        f"Game over! You have used all {MAX_ATTEMPTS} attempts. "
+        f"The number was {number}."
+    )
+    return False
+
+
+def main():
+    """Entry point: run the game and offer a replay."""
+    while True:
+        play_game()
+        again = input("Play again? (y/n): ").strip().lower()
+        if again != "y":
+            print("Thanks for playing!")
+            break
+
+
+if __name__ == "__main__":
+    main()
